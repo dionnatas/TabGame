@@ -12,7 +12,7 @@ interface GameStore {
   setPlayerName: (name: string) => void;
   setPlayerId: (playerId: string | null) => void;
   sync: () => Promise<void>;
-  action: (action: string, payload: Record<string, unknown>) => Promise<void>;
+  action: (action: string, payload: Record<string, unknown>, deferStateMs?: number) => Promise<unknown | null>;
   resetLocalPlayer: () => void;
 }
 
@@ -45,11 +45,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ state: data.state, error: null });
   },
-  action: async (actionName, payload) => {
+  action: async (actionName, payload, deferStateMs = 0) => {
     const data = await sendAction(actionName, payload);
     if (!data.ok) {
       set({ error: data.error ?? "Action failed" });
-      return;
+      return null;
     }
 
     const result = data.result as { playerId?: string } | undefined;
@@ -58,6 +58,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       localStorage.setItem("tabgame_player_id", result.playerId);
     }
 
+    if (deferStateMs > 0) {
+      setTimeout(() => {
+        set({ state: data.state ?? get().state, playerId: nextPlayerId, error: null });
+      }, deferStateMs);
+      return data.result ?? null;
+    }
+
     set({ state: data.state ?? get().state, playerId: nextPlayerId, error: null });
+    return data.result ?? null;
   }
 }));

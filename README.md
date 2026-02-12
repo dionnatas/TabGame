@@ -45,6 +45,7 @@ All events are POSTed to `/api/game` using `{ action, payload }`:
 - `vote_join`
 - `start_game`
 - `roll_dice`
+- `resolve_tile`
 - `buy_property`
 - `upgrade_property`
 
@@ -63,6 +64,7 @@ The API response includes `state` and an events log that maps to:
 - event_triggered
 - turn_change
 - game_over
+- resolve_tile
 - game_update (represented through periodic state sync)
 
 ## Local Development

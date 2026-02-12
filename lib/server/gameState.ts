@@ -11,8 +11,10 @@ const state: GameState = {
   currentTurnPlayerId: null,
   round: 1,
   pendingJoinRequest: null,
+  pendingTileAction: null,
   turnDeadline: null,
   lastProcessedTurnKey: null,
+  lastRoll: null,
   events: [],
   winnerId: null,
   updatedAt: Date.now()
@@ -52,11 +54,4 @@ export function toPublicState(): PublicGameState {
     ...state,
     netWorthByPlayer: Object.fromEntries(state.players.map((player) => [player.id, netWorthForPlayer(player.id)]))
   };
-}
-
-export function resetBoardOwnership() {
-  state.properties.forEach((property) => {
-    property.ownerId = null;
-    property.level = 0;
-  });
 }

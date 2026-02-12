@@ -44,6 +44,17 @@ export interface GameEvent {
   createdAt: number;
 }
 
+export interface PendingTileAction {
+  playerId: string;
+  tileIndex: number;
+  tileType: TileType;
+  title: string;
+  description: string;
+  propertyId?: string;
+  propertyValue?: number;
+  canBuy?: boolean;
+}
+
 export interface GameState {
   status: GameStatus;
   players: Player[];
@@ -52,8 +63,10 @@ export interface GameState {
   currentTurnPlayerId: string | null;
   round: number;
   pendingJoinRequest: JoinRequest | null;
+  pendingTileAction: PendingTileAction | null;
   turnDeadline: number | null;
   lastProcessedTurnKey: string | null;
+  lastRoll: { playerId: string; value: number } | null;
   events: GameEvent[];
   winnerId: string | null;
   updatedAt: number;

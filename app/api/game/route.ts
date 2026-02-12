@@ -3,6 +3,7 @@ import {
   buyProperty,
   processTimeoutIfNeeded,
   requestJoin,
+  resolveTileAction,
   rollDice,
   startGame,
   upgradeProperty,
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
         break;
       case "roll_dice":
         result = rollDice(body.payload);
+        break;
+      case "resolve_tile":
+        result = resolveTileAction(body.payload);
         break;
       case "buy_property":
         result = buyProperty(body.payload);

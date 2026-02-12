@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGameStore } from "@/lib/client/store";
 
 const BOARD_SIZE = 11;
@@ -32,6 +32,9 @@ function indexToCoord(index: number) {
 
 export function GameClient() {
   const { playerId, playerName, state, error, setPlayerName, setPlayerId, resetLocalPlayer, sync, action } = useGameStore();
+  const [diceRolling, setDiceRolling] = useState(false);
+  const [diceFace, setDiceFace] = useState<number | null>(null);
+  const [centerNotice, setCenterNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const cached = localStorage.getItem("tabgame_player_id");
@@ -46,19 +49,50 @@ export function GameClient() {
 
   const gridMap = useMemo(() => {
     if (!state) return new Map<string, number>();
-    return new Map(state.board.map((tile) => {
-      const pos = indexToCoord(tile.index);
-      return [`${pos.row}-${pos.col}`, tile.index];
-    }));
+    return new Map(
+      state.board.map((tile) => {
+        const pos = indexToCoord(tile.index);
+        return [`${pos.row}-${pos.col}`, tile.index];
+      })
+    );
   }, [state]);
 
   const canJoin = !playerId || !me;
+  const myPendingAction = state?.pendingTileAction && state.pendingTileAction.playerId === playerId ? state.pendingTileAction : null;
+
+  async function handleRollDice() {
+    if (!playerId || !myTurn || diceRolling) return;
+
+    setDiceRolling(true);
+    setCenterNotice(null);
+    const interval = setInterval(() => setDiceFace(Math.floor(Math.random() * 6) + 1), 90);
+
+    const result = (await action("roll_dice", { playerId }, 1000)) as { roll?: number } | null;
+
+    clearInterval(interval);
+    const finalValue = result?.roll ?? 1;
+    setDiceFace(finalValue);
+    setCenterNotice(`Resultado do dado: ${finalValue}`);
+    setTimeout(() => {
+      setCenterNotice(null);
+      setDiceRolling(false);
+    }, 1000);
+  }
+
+  async function handleResolveTile(buy?: boolean) {
+    if (!playerId || !myPendingAction) return;
+    const result = (await action("resolve_tile", { playerId, buy })) as { actionMessage?: string } | null;
+    if (result?.actionMessage) {
+      setCenterNotice(result.actionMessage);
+      setTimeout(() => setCenterNotice(null), 1600);
+    }
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 space-y-6">
       <header className="rounded-2xl bg-slate-900 p-4">
         <h1 className="text-3xl font-bold">TabGame: Multiplayer Landmark Tycoon</h1>
-        <p className="text-slate-300">Tabuleiro jogável em trilha 40 casas + pins por jogador.</p>
+        <p className="text-slate-300">Animação de dado + ação da casa no centro do tabuleiro.</p>
       </header>
 
       {canJoin && (
@@ -103,8 +137,8 @@ export function GameClient() {
                 </button>
               )}
 
-              {myTurn && state.status === "running" && (
-                <button className="rounded bg-indigo-400 text-black px-3 py-1" onClick={() => action("roll_dice", { playerId })}>
+              {myTurn && state.status === "running" && !state.pendingTileAction && (
+                <button className="rounded bg-indigo-400 text-black px-3 py-1" onClick={handleRollDice}>
                   Rolar dado
                 </button>
               )}
@@ -149,7 +183,7 @@ export function GameClient() {
       {state && (
         <section className="rounded-2xl bg-slate-900 p-4">
           <h3 className="font-semibold mb-3">Tabuleiro (caminho jogável)</h3>
-          <div className="rounded-2xl border-2 border-slate-700 bg-gradient-to-b from-sky-900 to-lime-900 p-3">
+          <div className="relative rounded-2xl border-2 border-slate-700 bg-gradient-to-b from-sky-900 to-lime-900 p-3">
             <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}>
               {Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, i) => {
                 const row = Math.floor(i / BOARD_SIZE);
@@ -161,8 +195,8 @@ export function GameClient() {
                   return (
                     <div key={`c-${row}-${col}`} className={`aspect-square rounded ${isCenter ? "bg-slate-900/50" : "bg-slate-950/30"}`}>
                       {isCenter && row === 5 && col === 5 && (
-                        <div className="h-full w-full grid place-items-center text-center text-xs text-slate-200">
-                          🎲 Trilha de 40 casas
+                        <div className="h-full w-full grid place-items-center text-center text-xs text-slate-200 px-1">
+                          🎲 Centro de animação e ações
                         </div>
                       )}
                     </div>
@@ -186,6 +220,49 @@ export function GameClient() {
                 );
               })}
             </div>
+
+            {(diceRolling || centerNotice || myPendingAction) && (
+              <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                <div className="pointer-events-auto w-[min(92%,420px)] rounded-2xl border-2 border-cyan-300 bg-slate-950/95 p-4 text-center shadow-2xl">
+                  <h4 className="font-semibold text-cyan-300">Centro do Tabuleiro</h4>
+
+                  {(diceRolling || centerNotice) && (
+                    <div className="mt-3 rounded-xl bg-slate-900 p-3">
+                      <p className="text-sm text-slate-300">Dado</p>
+                      <div className="mx-auto mt-2 grid h-16 w-16 place-items-center rounded-xl border-2 border-slate-400 bg-white text-3xl font-black text-slate-900">
+                        {diceFace ?? "?"}
+                      </div>
+                      {diceRolling && <p className="mt-2 text-sm text-cyan-300 animate-pulse">Jogando dado...</p>}
+                      {centerNotice && <p className="mt-2 text-sm text-emerald-300">{centerNotice}</p>}
+                    </div>
+                  )}
+
+                  {myPendingAction && (
+                    <div className="mt-3 rounded-xl bg-slate-900 p-3 text-left">
+                      <p className="font-semibold text-amber-300">{myPendingAction.title}</p>
+                      <p className="text-sm text-slate-200 mt-1">{myPendingAction.description}</p>
+
+                      {myPendingAction.tileType === "property" && myPendingAction.canBuy ? (
+                        <div className="mt-3 flex gap-2 justify-center">
+                          <button className="rounded bg-emerald-500 px-3 py-1 text-black font-semibold" onClick={() => handleResolveTile(true)}>
+                            Comprar? Sim
+                          </button>
+                          <button className="rounded bg-rose-500 px-3 py-1 text-black font-semibold" onClick={() => handleResolveTile(false)}>
+                            Comprar? Não
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex justify-center">
+                          <button className="rounded bg-indigo-400 px-3 py-1 text-black font-semibold" onClick={() => handleResolveTile(false)}>
+                            Executar ação
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -203,14 +280,9 @@ export function GameClient() {
                   Value {property.value} / Rent {property.rent} / Level {property.level}
                 </p>
                 <p>Owner: {state.players.find((player) => player.id === property.ownerId)?.name ?? "None"}</p>
-                {myTurn && me?.id === property.ownerId && (
+                {myTurn && me?.id === property.ownerId && !state.pendingTileAction && (
                   <button className="mt-1 rounded bg-amber-400 text-black px-2 py-1" onClick={() => action("upgrade_property", { playerId, propertyId: property.id })}>
                     Upgrade
-                  </button>
-                )}
-                {myTurn && me && !property.ownerId && state.board[me.position]?.propertyId === property.id && (
-                  <button className="mt-1 ml-2 rounded bg-cyan-400 text-black px-2 py-1" onClick={() => action("buy_property", { playerId, propertyId: property.id })}>
-                    Buy
                   </button>
                 )}
               </div>
