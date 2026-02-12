@@ -3,33 +3,6 @@
 import { useEffect, useMemo } from "react";
 import { useGameStore } from "@/lib/client/store";
 
-const BOARD_SIDE = 11;
-const PIN_COLORS = [
-  "bg-rose-500",
-  "bg-sky-500",
-  "bg-emerald-500",
-  "bg-amber-400",
-  "bg-fuchsia-500",
-  "bg-orange-500",
-  "bg-lime-500",
-  "bg-violet-500"
-];
-
-function indexToCoord(index: number) {
-  if (index <= 10) return { row: 10, col: 10 - index };
-  if (index <= 20) return { row: 10 - (index - 10), col: 0 };
-  if (index <= 30) return { row: 0, col: index - 20 };
-  return { row: index - 30, col: 10 };
-}
-
-function tileTone(type: string) {
-  if (type === "property") return "border-cyan-400/70 bg-cyan-900/40";
-  if (type === "luck") return "border-emerald-400/70 bg-emerald-900/30";
-  if (type === "bad_luck") return "border-rose-400/70 bg-rose-900/30";
-  if (type === "special_event") return "border-amber-300/70 bg-amber-900/30";
-  return "border-slate-600 bg-slate-800/80";
-}
-
 export function GameClient() {
   const { playerId, playerName, state, error, setPlayerName, sync, action } = useGameStore();
 
@@ -44,16 +17,8 @@ export function GameClient() {
   const me = useMemo(() => state?.players.find((player) => player.id === playerId), [state, playerId]);
   const myTurn = state?.currentTurnPlayerId === playerId;
 
-  const tileKeyByIndex = useMemo(() => {
-    if (!state) return new Map<string, number>();
-    return new Map(state.board.map((tile) => {
-      const coord = indexToCoord(tile.index);
-      return [`${coord.row}-${coord.col}`, tile.index];
-    }));
-  }, [state]);
-
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 space-y-6">
+    <main className="mx-auto max-w-6xl px-4 py-8 space-y-6">
       <header>
         <h1 className="text-3xl font-bold">TabGame: Multiplayer Landmark Tycoon</h1>
         <p className="text-slate-300">Server-authoritative board game with polling fallback for Vercel serverless.</p>
@@ -118,16 +83,14 @@ export function GameClient() {
           </article>
 
           <article className="rounded-xl bg-slate-900 p-4 space-y-3">
-            <h3 className="font-semibold">Players (pins)</h3>
-            {state.players.map((player, idx) => (
+            <h3 className="font-semibold">Players</h3>
+            {state.players.map((player) => (
               <div key={player.id} className="rounded bg-slate-800 p-2 text-sm">
-                <p className="flex items-center gap-2">
-                  <span className={`inline-block h-3 w-3 rounded-full ${PIN_COLORS[idx % PIN_COLORS.length]}`} />
+                <p>
                   {player.name} {player.isHost ? "(Host)" : ""}
                 </p>
                 <p>Coins: {player.coins}</p>
                 <p>Net Worth: {state.netWorthByPlayer[player.id] ?? 0}</p>
-                <p>Posição: casa #{player.position}</p>
               </div>
             ))}
           </article>
@@ -135,61 +98,20 @@ export function GameClient() {
       )}
 
       {state && (
-        <section className="grid gap-4 lg:grid-cols-3">
-          <article className="rounded-xl bg-slate-900 p-4 lg:col-span-2">
-            <h3 className="font-semibold mb-3">Tabuleiro (caminho com 40 casas + pins)</h3>
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${BOARD_SIDE}, minmax(0, 1fr))` }}>
-              {Array.from({ length: BOARD_SIDE * BOARD_SIDE }, (_, cellIndex) => {
-                const row = Math.floor(cellIndex / BOARD_SIDE);
-                const col = cellIndex % BOARD_SIDE;
-                const tileIndex = tileKeyByIndex.get(`${row}-${col}`);
-
-                if (tileIndex === undefined) {
-                  const isCenter = row >= 3 && row <= 7 && col >= 3 && col <= 7;
-                  return (
-                    <div
-                      key={`empty-${row}-${col}`}
-                      className={`aspect-square rounded ${isCenter ? "bg-slate-800/60 border border-slate-700" : "bg-slate-950/60"}`}
-                    >
-                      {isCenter && row === 5 && col === 5 && (
-                        <div className="h-full w-full grid place-items-center text-center text-[10px] sm:text-xs text-slate-300 px-1">
-                          Percorra o caminho<br />e evolua seus monumentos
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
-                const tile = state.board[tileIndex];
-                const playersOnTile = state.players.filter((player) => player.position === tile.index);
-
-                return (
-                  <div
-                    key={tile.id}
-                    className={`aspect-square rounded border p-1 text-[9px] sm:text-[10px] relative transition-all ${tileTone(tile.type)}`}
-                    title={`${tile.index} - ${tile.label}`}
-                  >
-                    <p className="font-semibold leading-tight">#{tile.index}</p>
-                    <p className="leading-tight line-clamp-2">{tile.label}</p>
-                    <div className="absolute bottom-1 left-1 right-1 flex flex-wrap gap-1">
-                      {playersOnTile.map((player) => {
-                        const playerColorIndex = state.players.findIndex((item) => item.id === player.id);
-                        return (
-                          <span
-                            key={`pin-${tile.id}-${player.id}`}
-                            className={`h-3 w-3 rounded-full ring-1 ring-black ${PIN_COLORS[playerColorIndex % PIN_COLORS.length]}`}
-                            title={player.name}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+        <section className="grid gap-4 md:grid-cols-2">
+          <article className="rounded-xl bg-slate-900 p-4">
+            <h3 className="font-semibold mb-2">Board (40 tiles)</h3>
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              {state.board.map((tile) => (
+                <div key={tile.id} className="rounded bg-slate-800 p-2">
+                  <p>#{tile.index}</p>
+                  <p>{tile.type}</p>
+                </div>
+              ))}
             </div>
           </article>
 
-          <article className="rounded-xl bg-slate-900 p-4 space-y-2 max-h-[640px] overflow-auto">
+          <article className="rounded-xl bg-slate-900 p-4 space-y-2">
             <h3 className="font-semibold">Properties</h3>
             {state.properties.map((property) => (
               <div key={property.id} className="rounded bg-slate-800 p-2 text-xs">

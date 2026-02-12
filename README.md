@@ -26,6 +26,7 @@ TabGame is a startup-ready, browser-based multiplayer board game inspired by The
   - Coliseu
   - Machu Picchu
   - Pirâmides de Gizé
+
 - Color pin/token per player, moving across board tiles based on authoritative position updates.
 - Property purchase and upgrade system.
 - Luck, bad luck, and special events.
